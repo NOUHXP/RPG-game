@@ -52,7 +52,7 @@
                 <div class="w-full md:w-1/3 flex flex-col items-end">
                     <div class="flex justify-between w-full md:w-3/4 text-xs font-bold text-gray-300 mb-1">
                         <span>HULL</span>
-                        <span id="hpText" class="text-red-400 drop-shadow-[0_0_5px_#ef4444]">10/10</span>
+                        <span id="hpText" class="text-red-400 drop-shadow-[0_0_5px_#ef4444]">20/20</span>
                     </div>
                     <div class="health-bar-container w-full md:w-3/4 h-3 rounded-sm overflow-hidden mb-2">
                         <div id="hpBar" class="health-bar h-full w-full"></div>
@@ -101,13 +101,17 @@
             <span class="text-white font-bold text-[10px]">SKILL</span>
         </div>
 
+        <div id="mobileSwapBtn" class="absolute bottom-24 right-4 w-16 h-16 bg-cyan-500 bg-opacity-20 rounded-full border border-cyan-500 z-10 hidden flex-col items-center justify-center pointer-events-auto shadow-[0_0_15px_rgba(0,255,255,0.4)] active:bg-cyan-500 active:bg-opacity-50 transition-all">
+            <span class="text-white font-bold text-[10px]">SWAP</span>
+        </div>
+
         <!-- Wave Announcement Overlay -->
         <div id="waveAnnounce" class="absolute inset-0 flex items-center justify-center pointer-events-none z-20 opacity-0 transition-opacity duration-500">
             <h2 id="waveAnnounceText" class="text-6xl md:text-8xl font-black text-white text-center drop-shadow-[0_0_20px_#fff] tracking-widest scale-150 transform transition-transform duration-1000">WAVE 1</h2>
         </div>
 
         <!-- Upgrade Menu -->
-        <div id="upgradeMenu" class="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-90 z-30 hidden backdrop-blur-md">
+        <div id="upgradeMenu" class="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-90 z-30 hidden backdrop-blur-md pointer-events-auto">
             <h1 class="text-4xl md:text-6xl font-black mb-2 text-fuchsia-400 neon-text-purple">LEVEL UP!</h1>
             <p class="text-xl mb-8 text-gray-300">Choose an upgrade to enhance your ship</p>
             <div id="upgradeCardsContainer" class="flex flex-row flex-wrap gap-4 md:gap-6 max-w-4xl px-4 w-full justify-center">
@@ -128,7 +132,7 @@
                         <li class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444] shrink-0"></div> <span>Survive escalating waves. Defeat the Bosses.</span></li>
                     </ul>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-black bg-opacity-50 p-3 rounded border border-gray-800">
-                        <div><strong class="text-cyan-400 block mb-1">DESKTOP</strong>WASD to Move<br>Mouse to Aim & Shoot<br>SHIFT to Boost<br>Right-Click to use Skill<br>'L' to Change Skill</div>
+                        <div><strong class="text-cyan-400 block mb-1">DESKTOP</strong>WASD to Move<br>Mouse to Aim & Shoot<br>SHIFT to Boost<br>Right-Click to use Skill<br>'L' to Change Skill<br>Shift+D to skip to Wave 9</div>
                         <div><strong class="text-cyan-400 block mb-1">MOBILE</strong>Joystick to Move<br>Tap anywhere to Shoot<br>Skill Button to use</div>
                     </div>
                 </div>
@@ -251,35 +255,39 @@
                 this.angle = 0;
                 this.color = '#0ff';
                 
-                // RPG Stats
+                // RPG Stats - HEAVILY BUFFED
                 this.level = 1;
                 this.xp = 0;
                 this.xpNeeded = 50;
-                this.maxHealth = 10;
+                this.maxHealth = 20; // Up from 10
                 this.health = this.maxHealth;
                 this.iframes = 0;
                 
-                // Attack Stats
-                this.projectiles = 1;
-                this.damage = 1;
-                this.fireRate = 12; 
-                this.projectileSpeed = 18;
+                // Attack Stats - BUFFED
+                this.projectiles = 2; // Up from 1
+                this.damage = 2; // Up from 1
+                this.fireRate = 8; // Faster (was 12)
+                this.projectileSpeed = 22; // Faster (was 18)
                 
-                // Movement Stats
-                this.maxEnergy = 100;
+                // Movement Stats - BUFFED
+                this.maxEnergy = 150; // More energy
                 this.energy = this.maxEnergy;
-                this.baseAcceleration = 0.4;
-                this.baseMaxSpeed = 8;
+                this.baseAcceleration = 0.6; // Better handling
+                this.baseMaxSpeed = 10; // Faster
                 this.cooldown = 0;
 
                 // Abilities
                 this.abilities = [
                     { name: 'MISSILE SWARM', maxCd: 300, currentCd: 0, color: '#d946ef' }, // 5 seconds
                     { name: 'EMP NOVA', maxCd: 600, currentCd: 0, color: '#38bdf8' },      // 10 seconds
-                    { name: 'PLASMA SHIELD', maxCd: 900, currentCd: 0, color: '#4ade80' }  // 15 seconds
+                    { name: 'PLASMA SHIELD', maxCd: 900, currentCd: 0, color: '#4ade80' }, // 15 seconds
+                    { name: 'STARBURST', maxCd: 480, currentCd: 0, color: '#f59e0b' },     // 8 seconds
+                    { name: 'DEATH RAY', maxCd: 720, currentCd: 0, color: '#ef4444' },     // 12 seconds
+                    { name: 'SINGULARITY', maxCd: 900, currentCd: 0, color: '#8b5cf6' }    // 15 seconds
                 ];
                 this.currentAbilityIndex = 0;
                 this.shieldActive = 0; // Frames remaining for shield
+                this.beamActive = 0; // Frames for Death Ray
                 
                 this.trail = [];
             }
@@ -344,15 +352,28 @@
                 screenShake += 5;
 
                 if (ability.name === 'MISSILE SWARM') {
-                    for (let i = 0; i < 6; i++) {
-                        const spreadAngle = this.angle - Math.PI/2 + randomRange(-1, 1);
-                        projectiles.push(new HomingProjectile(this.x, this.y, Math.cos(spreadAngle)*10, Math.sin(spreadAngle)*10, this.damage * 2, '#d946ef'));
+                    for (let i = 0; i < 12; i++) { // 12 Missiles now
+                        const spreadAngle = this.angle - Math.PI/2 + randomRange(-1.5, 1.5);
+                        projectiles.push(new HomingProjectile(this.x, this.y, Math.cos(spreadAngle)*12, Math.sin(spreadAngle)*12, this.damage * 3, '#d946ef'));
                     }
                 } else if (ability.name === 'EMP NOVA') {
-                    novaEffects.push(new Nova(this.x, this.y, 400, '#38bdf8', 3));
+                    novaEffects.push(new Nova(this.x, this.y, 600, '#38bdf8', 10)); // 600 radius, 10 damage
                 } else if (ability.name === 'PLASMA SHIELD') {
-                    this.shieldActive = 300; 
+                    this.shieldActive = 450; // 7.5 seconds
                     addFloatingText(this.x, this.y - 40, "SHIELD UP", '#4ade80', 1.5);
+                } else if (ability.name === 'STARBURST') {
+                    for (let i = 0; i < 36; i++) {
+                        const a = (i / 36) * Math.PI * 2;
+                        projectiles.push(new Projectile(this.x, this.y, Math.cos(a)*15, Math.sin(a)*15, this.damage * 5, '#f59e0b', true));
+                    }
+                } else if (ability.name === 'DEATH RAY') {
+                    this.beamActive = 120; // Lasts 2 seconds
+                    addFloatingText(this.x, this.y - 40, "FIRING BEAM", '#ef4444', 1.5);
+                } else if (ability.name === 'SINGULARITY') {
+                    const targetX = isMobile ? this.x + Math.cos(this.angle - Math.PI/2)*400 : mouse.x + camera.x;
+                    const targetY = isMobile ? this.y + Math.sin(this.angle - Math.PI/2)*400 : mouse.y + camera.y;
+                    singularities.push(new Singularity(targetX, targetY));
+                    addFloatingText(this.x, this.y - 40, "GRAVITY WELL", '#8b5cf6', 1.5);
                 }
             }
 
@@ -436,6 +457,25 @@
                     ctx.fillStyle = `rgba(74, 222, 128, 0.1)`;
                     ctx.fill();
                 }
+
+                // Draw Death Ray if active
+                if (this.beamActive > 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.height / 2);
+                    ctx.lineTo(0, -2500);
+                    ctx.strokeStyle = '#ef4444';
+                    ctx.lineWidth = 40 + Math.random() * 15;
+                    ctx.shadowBlur = 30; ctx.shadowColor = '#ef4444';
+                    ctx.stroke();
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.height / 2);
+                    ctx.lineTo(0, -2500);
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 15;
+                    ctx.stroke();
+                }
+                
                 ctx.restore();
             }
 
@@ -456,6 +496,33 @@
                 if (this.shieldActive > 0) this.shieldActive--;
                 if (this.iframes > 0) this.iframes--;
 
+                // Death Ray Logic
+                if (this.beamActive > 0) {
+                    this.beamActive--;
+                    screenShake += 3;
+                    const beamAngle = this.angle - Math.PI / 2;
+                    
+                    enemies.forEach(e => {
+                        const angleToEnemy = Math.atan2(e.y - this.y, e.x - this.x);
+                        let angleDiff = Math.abs(angleToEnemy - beamAngle);
+                        angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
+                        if (Math.abs(angleDiff) < 0.15 && distance(this.x, this.y, e.x, e.y) < 2500) {
+                            e.health -= this.damage * 1.5; 
+                            e.hitByNova = true; // Temporary hit stun flag
+                            createParticles(e.x, e.y, '#ef4444', 2, 3);
+                        }
+                    });
+                    
+                    if (boss && gameState.bossActive) {
+                        const angleToBoss = Math.atan2(boss.y - this.y, boss.x - this.x);
+                        let angleDiff = Math.abs(angleToBoss - beamAngle);
+                        angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
+                        if (Math.abs(angleDiff) < 0.15 && distance(this.x, this.y, boss.x, boss.y) < 2500) {
+                            boss.takeDamage(this.damage * 2); 
+                        }
+                    }
+                }
+
                 let ax = 0, ay = 0;
                 let maxSpeed = this.baseMaxSpeed;
 
@@ -464,7 +531,7 @@
                     this.energy -= 1;
                     if(frameCount % 5 === 0) this.updateUI(); // Throttled UI update
                 } else if (this.energy < this.maxEnergy) {
-                    this.energy += 0.2;
+                    this.energy += 0.5; // Faster regen
                     if(frameCount % 10 === 0) this.updateUI();
                 }
 
@@ -695,6 +762,64 @@
             }
         }
 
+        class Singularity {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.life = 300; // 5 seconds
+                this.radius = 600; // Pull radius
+                this.eventHorizon = 40; // Damage radius
+            }
+            draw() {
+                if (this.x < camera.x - this.radius || this.x > camera.x + camera.width + this.radius || this.y < camera.y - this.radius || this.y > camera.y + camera.height + this.radius) return;
+                ctx.save();
+                ctx.translate(this.x - camera.x, this.y - camera.y);
+                
+                ctx.shadowBlur = 40; ctx.shadowColor = '#8b5cf6';
+                ctx.beginPath(); ctx.arc(0, 0, this.eventHorizon, 0, Math.PI * 2);
+                ctx.fillStyle = '#050510'; ctx.fill();
+                ctx.lineWidth = 4; ctx.strokeStyle = '#8b5cf6'; ctx.stroke();
+                
+                // Swirling gravity dust
+                for (let i = 0; i < 3; i++) {
+                    const a = Math.random() * Math.PI * 2;
+                    const r = Math.random() * this.radius;
+                    particles.push(new Particle(this.x + Math.cos(a)*r, this.y + Math.sin(a)*r, '#a855f7', 0.5, 0.1));
+                }
+                
+                ctx.restore();
+            }
+            update() {
+                if(isPausedForUpgrade) return;
+                this.life--;
+                
+                // Pull and damage enemies
+                enemies.forEach(e => {
+                    const d = distance(this.x, this.y, e.x, e.y);
+                    if (d < this.radius) {
+                        const angle = Math.atan2(this.y - e.y, this.x - e.x);
+                        const force = (this.radius - d) / 30; // Gravity pull strength
+                        e.x += Math.cos(angle) * force;
+                        e.y += Math.sin(angle) * force;
+                        
+                        if (d < this.eventHorizon) {
+                            e.health -= 3; // Constant crushing damage
+                            createParticles(e.x, e.y, '#8b5cf6', 1);
+                        }
+                    }
+                });
+                
+                // Pull and damage Boss
+                if (boss && gameState.bossActive) {
+                    const d = distance(this.x, this.y, boss.x, boss.y);
+                    if (d < this.radius + boss.radius) {
+                        if (frameCount % 5 === 0) boss.takeDamage(5);
+                    }
+                }
+                
+                this.draw();
+            }
+        }
+
         class Drop {
             constructor(x, y, type) {
                 this.x = x; this.y = y;
@@ -765,7 +890,7 @@
                 
                 DOM.bossHud.classList.remove('hidden');
                 DOM.bossHud.classList.add('flex');
-                DOM.bossName.innerText = `VOID LEVIATHAN MK-${loopMultiplier}`;
+                DOM.bossName.innerText = `VOID LEVIATHAN`;
                 this.updateUI();
                 
                 screenShake += 20;
@@ -928,25 +1053,453 @@
                     
                     gameState.bossActive = false;
                     boss = null;
-                    advanceWave();
+                    
+                    // Wave 3 Bonus
+                    triggerBoss1Rewards();
+                    
+                    setTimeout(() => { advanceWave(); }, 2000);
+                }
+            }
+        }
+
+        class BossPhaseTwo {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.radius = 90;
+                this.color = '#a855f7'; // Purple
+                this.maxHealth = 800; 
+                this.health = this.maxHealth;
+                this.angle = 0;
+                this.stateTimer = 0;
+                this.hitByNova = false; 
+                this.hitFlash = 0;
+                this.phase = 1; // 1 = Gravity, 2 = Hyper
+                this.nextDropThreshold = this.maxHealth * 0.9; 
+
+                // Dash tracking
+                this.dashTarget = null;
+                this.isDashing = false;
+
+                DOM.bossHud.classList.remove('hidden');
+                DOM.bossHud.classList.add('flex');
+                DOM.bossName.innerText = `ECLIPSE BRINGER`;
+                DOM.bossName.className = "text-2xl font-black text-purple-500 tracking-widest neon-text-purple mb-2";
+                DOM.bossHpBar.className = "h-full bg-purple-500 w-full transition-all duration-100 shadow-[0_0_15px_rgba(168,85,247,1)]";
+                DOM.bossHpBar.parentElement.className = "w-full max-w-2xl h-6 bg-purple-900 rounded-sm border-2 border-purple-500 overflow-hidden relative";
+                
+                this.updateUI();
+                screenShake += 30;
+                novaEffects.push(new Nova(this.x, this.y, 1000, '#a855f7', 0));
+            }
+
+            updateUI() { DOM.bossHpBar.style.width = `${(this.health / this.maxHealth) * 100}%`; }
+
+            draw() {
+                if (this.x < camera.x - 300 || this.x > camera.x + camera.width + 300 || this.y < camera.y - 300 || this.y > camera.y + camera.height + 300) return; 
+
+                ctx.save();
+                ctx.translate(this.x - camera.x, this.y - camera.y);
+                ctx.rotate(this.angle);
+                
+                ctx.shadowBlur = 40; 
+                ctx.shadowColor = this.hitFlash > 0 ? '#fff' : (this.phase === 1 ? '#a855f7' : '#fff');
+
+                // Draw multi-pointed star
+                ctx.beginPath();
+                let spikes = this.phase === 1 ? 8 : 12;
+                let outer = this.radius;
+                let inner = this.radius / 2;
+                for (let i = 0; i < spikes * 2; i++) {
+                    let r = (i % 2 === 0) ? outer : inner;
+                    let a = (i * Math.PI) / spikes;
+                    if (i === 0) ctx.moveTo(r * Math.cos(a), r * Math.sin(a));
+                    else ctx.lineTo(r * Math.cos(a), r * Math.sin(a));
+                }
+                ctx.closePath();
+                
+                ctx.fillStyle = this.hitFlash > 0 ? '#fff' : '#050510';
+                ctx.fill();
+                ctx.lineWidth = 5; 
+                ctx.strokeStyle = this.hitFlash > 0 ? '#fff' : (this.phase === 1 ? this.color : '#fff'); 
+                ctx.stroke();
+
+                // Core
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius / 3, 0, Math.PI * 2);
+                ctx.fillStyle = this.phase === 1 ? '#a855f7' : '#fff';
+                ctx.fill();
+                
+                ctx.restore();
+
+                // Telegraph for Dash
+                if (this.phase === 2 && this.dashTarget && !this.isDashing) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(this.x - camera.x, this.y - camera.y);
+                    ctx.lineTo(this.dashTarget.x - camera.x, this.dashTarget.y - camera.y);
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${Math.sin(frameCount * 0.5) * 0.5 + 0.5})`;
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([10, 10]);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+
+            update() {
+                if (isPausedForUpgrade) return;
+                if (this.hitFlash > 0) this.hitFlash--;
+                this.stateTimer++;
+
+                if (this.health <= this.maxHealth / 2 && this.phase === 1) {
+                    this.phase = 2;
+                    this.stateTimer = 0;
+                    screenShake += 40;
+                    novaEffects.push(new Nova(this.x, this.y, 1200, '#fff', 0));
+                    addFloatingText(this.x, this.y - 100, "HYPER DRIVE ENGAGED", '#fff', 2);
+                }
+
+                if (this.phase === 1) {
+                    this.angle += 0.02;
+                    
+                    // Phase 1: Gravity Pull & Spirals
+                    const d = distance(this.x, this.y, player.x, player.y);
+                    if (d < 1500 && d > 200) {
+                        const pullAngle = Math.atan2(this.y - player.y, this.x - player.x);
+                        player.vx += Math.cos(pullAngle) * 0.15; // Suck player in
+                        player.vy += Math.sin(pullAngle) * 0.15;
+                    }
+
+                    if (this.stateTimer % 15 === 0) {
+                        const a = this.angle * 3;
+                        projectiles.push(new Projectile(this.x, this.y, Math.cos(a)*8, Math.sin(a)*8, 1, '#a855f7', false));
+                        projectiles.push(new Projectile(this.x, this.y, Math.cos(a+Math.PI)*8, Math.sin(a+Math.PI)*8, 1, '#a855f7', false));
+                    }
+                    
+                    // Move slowly to player
+                    if (d > 500) {
+                        const moveAngle = Math.atan2(player.y - this.y, player.x - this.x);
+                        this.x += Math.cos(moveAngle) * 1.5;
+                        this.y += Math.sin(moveAngle) * 1.5;
+                    }
+                } else {
+                    // Phase 2: Homing missiles and Light-Speed Dashes
+                    this.angle += 0.08;
+
+                    if (this.stateTimer % 200 === 0) {
+                        // Launch homing missiles
+                        for(let i=0; i<4; i++) {
+                            const a = (i/4) * Math.PI*2;
+                            const p = new HomingProjectile(this.x, this.y, Math.cos(a)*5, Math.sin(a)*5, 2, '#fff');
+                            p.isPlayer = false; // Override to target player
+                            p.target = player;
+                            projectiles.push(p);
+                        }
+                    }
+
+                    // Dash Logic
+                    if (this.stateTimer % 300 === 200) {
+                        // Pick target behind player
+                        const pAngle = Math.atan2(player.y - this.y, player.x - this.x);
+                        this.dashTarget = { x: player.x + Math.cos(pAngle)*800, y: player.y + Math.sin(pAngle)*800 };
+                    }
+
+                    if (this.stateTimer % 300 === 260 && this.dashTarget) {
+                        // Execute Dash
+                        this.isDashing = true;
+                        screenShake += 15;
+                    }
+
+                    if (this.isDashing) {
+                        const dashAngle = Math.atan2(this.dashTarget.y - this.y, this.dashTarget.x - this.x);
+                        this.x += Math.cos(dashAngle) * 40;
+                        this.y += Math.sin(dashAngle) * 40;
+                        createParticles(this.x, this.y, '#fff', 2, 2); // Trail
+                        
+                        // Hit player if close
+                        if (distance(this.x, this.y, player.x, player.y) < this.radius + player.width) {
+                            player.takeDamage(2);
+                        }
+
+                        if (distance(this.x, this.y, this.dashTarget.x, this.dashTarget.y) < 50) {
+                            this.isDashing = false;
+                            this.dashTarget = null;
+                        }
+                    }
+                }
+                this.draw();
+            }
+
+            takeDamage(dmg) {
+                this.health -= dmg;
+                this.hitFlash = 5;
+                addFloatingText(this.x + randomRange(-40,40), this.y + randomRange(-40,40), Math.floor(dmg), '#fff', 1.5);
+                this.updateUI();
+                
+                if (this.health <= this.nextDropThreshold && this.health > 0) {
+                    this.nextDropThreshold -= this.maxHealth * 0.1;
+                    for(let i=0; i<4; i++) drops.push(new Drop(this.x + randomRange(-60,60), this.y + randomRange(-60,60), 'hp'));
+                }
+                
+                if (this.health <= 0) {
+                    screenShake += 80;
+                    for(let i=0; i<200; i++) createParticles(this.x + randomRange(-100, 100), this.y + randomRange(-100, 100), '#a855f7', 3, 15);
+                    novaEffects.push(new Nova(this.x, this.y, 1500, '#fff', 0));
+                    
+                    for(let i=0; i<50; i++) drops.push(new Drop(this.x + randomRange(-50,50), this.y + randomRange(-50,50), 'xp'));
+                    for(let i=0; i<15; i++) drops.push(new Drop(this.x + randomRange(-50,50), this.y + randomRange(-50,50), 'hp'));
+                    
+                    gameState.score += 15000;
+                    DOM.score.innerText = gameState.score;
+                    DOM.bossHud.classList.add('hidden');
+                    addFloatingText(this.x, this.y, "ECLIPSE BROKEN", '#fff', 4);
+                    
+                    gameState.bossActive = false;
+                    boss = null;
+                    setTimeout(() => { advanceWave(); }, 2000);
+                }
+            }
+        }
+
+        class BossWave9 {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.radius = 120;
+                this.color = '#38bdf8'; // Cyan
+                this.maxHealth = 2000; 
+                this.health = this.maxHealth;
+                this.angle = 0;
+                this.stateTimer = 0;
+                this.hitByNova = false; 
+                this.hitFlash = 0;
+                this.phase = 1; 
+                this.nextDropThreshold = this.maxHealth * 0.9; 
+
+                // Laser Cross state
+                this.crossLasersActive = false;
+                this.laserAngle = 0;
+
+                DOM.bossHud.classList.remove('hidden');
+                DOM.bossHud.classList.add('flex');
+                DOM.bossName.innerText = `NEBULA WEAVER`;
+                DOM.bossName.className = "text-2xl font-black text-cyan-400 tracking-widest neon-text mb-2";
+                DOM.bossHpBar.className = "h-full bg-cyan-400 w-full transition-all duration-100 shadow-[0_0_15px_rgba(34,211,238,1)]";
+                DOM.bossHpBar.parentElement.className = "w-full max-w-2xl h-6 bg-cyan-900 rounded-sm border-2 border-cyan-500 overflow-hidden relative";
+                
+                this.updateUI();
+                screenShake += 40;
+                novaEffects.push(new Nova(this.x, this.y, 1500, '#38bdf8', 0));
+            }
+
+            updateUI() { DOM.bossHpBar.style.width = `${(this.health / this.maxHealth) * 100}%`; }
+
+            draw() {
+                if (this.x < camera.x - 300 || this.x > camera.x + camera.width + 300 || this.y < camera.y - 300 || this.y > camera.y + camera.height + 300) return; 
+
+                ctx.save();
+                ctx.translate(this.x - camera.x, this.y - camera.y);
+
+                // Draw rotating cross lasers if active
+                if (this.crossLasersActive) {
+                    ctx.save();
+                    ctx.rotate(this.laserAngle);
+                    ctx.shadowBlur = 30; ctx.shadowColor = '#38bdf8';
+                    
+                    for(let i=0; i<4; i++) {
+                        ctx.rotate(Math.PI / 2);
+                        ctx.beginPath();
+                        ctx.moveTo(this.radius, 0);
+                        ctx.lineTo(2500, 0);
+                        ctx.strokeStyle = '#38bdf8';
+                        ctx.lineWidth = 30;
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(this.radius, 0);
+                        ctx.lineTo(2500, 0);
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 10;
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+
+                ctx.rotate(this.angle);
+                
+                ctx.shadowBlur = 40; 
+                ctx.shadowColor = this.hitFlash > 0 ? '#fff' : '#38bdf8';
+
+                // Draw diamond shape
+                ctx.beginPath();
+                ctx.moveTo(this.radius, 0);
+                ctx.lineTo(0, this.radius);
+                ctx.lineTo(-this.radius, 0);
+                ctx.lineTo(0, -this.radius);
+                ctx.closePath();
+                
+                ctx.fillStyle = this.hitFlash > 0 ? '#fff' : '#050510';
+                ctx.fill();
+                ctx.lineWidth = 8; 
+                ctx.strokeStyle = this.hitFlash > 0 ? '#fff' : this.color; 
+                ctx.stroke();
+
+                // Core
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius / 2 + Math.sin(frameCount*0.1)*10, 0, Math.PI * 2);
+                ctx.fillStyle = this.phase === 1 ? '#38bdf8' : '#ef4444'; // Turns red in phase 2
+                ctx.fill();
+                
+                ctx.restore();
+            }
+
+            update() {
+                if (isPausedForUpgrade) return;
+                if (this.hitFlash > 0) this.hitFlash--;
+                this.stateTimer++;
+                this.angle += 0.01;
+
+                if (this.health <= this.maxHealth / 2 && this.phase === 1) {
+                    this.phase = 2;
+                    this.stateTimer = 0;
+                    this.crossLasersActive = false; // Reset laser state
+                    screenShake += 50;
+                    novaEffects.push(new Nova(this.x, this.y, 1200, '#ef4444', 0));
+                    addFloatingText(this.x, this.y - 100, "CORE OVERLOAD", '#ef4444', 2);
+                }
+
+                const d = distance(this.x, this.y, player.x, player.y);
+                
+                if (this.phase === 1) {
+                    // Slowly drift towards center of map
+                    const cAngle = Math.atan2(WORLD_SIZE/2 - this.y, WORLD_SIZE/2 - this.x);
+                    this.x += Math.cos(cAngle) * 0.5;
+                    this.y += Math.sin(cAngle) * 0.5;
+
+                    // Rotating Cross Lasers
+                    if (this.stateTimer % 400 === 0) {
+                        this.crossLasersActive = true;
+                        this.laserAngle = 0;
+                        screenShake += 10;
+                    }
+                    if (this.stateTimer % 400 === 200) {
+                        this.crossLasersActive = false;
+                    }
+
+                    if (this.crossLasersActive) {
+                        this.laserAngle += 0.03; // Rotate lasers
+                        screenShake += 1;
+                        
+                        // Hit detection for cross lasers
+                        for(let i=0; i<4; i++) {
+                            const beamAngle = this.laserAngle + (i * Math.PI / 2);
+                            const angleToPlayer = Math.atan2(player.y - this.y, player.x - this.x);
+                            let angleDiff = Math.abs(angleToPlayer - beamAngle);
+                            angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
+                            if (Math.abs(angleDiff) < 0.1 && d < 2500) {
+                                player.takeDamage(2); 
+                            }
+                        }
+                    }
+
+                    // Occasional spread fire
+                    if (this.stateTimer % 60 === 0 && !this.crossLasersActive) {
+                        for(let i=0; i<10; i++) {
+                            const a = (i/10) * Math.PI * 2 + this.angle;
+                            projectiles.push(new Projectile(this.x, this.y, Math.cos(a)*10, Math.sin(a)*10, 1, '#38bdf8', false));
+                        }
+                    }
+
+                } else {
+                    // PHASE 2: Aggressive tracking, mines, and homing missiles
+                    const moveAngle = Math.atan2(player.y - this.y, player.x - this.x);
+                    this.x += Math.cos(moveAngle) * 2;
+                    this.y += Math.sin(moveAngle) * 2;
+
+                    // Homing Missiles
+                    if (this.stateTimer % 120 === 0) {
+                        for(let i=0; i<3; i++) {
+                            const a = moveAngle + randomRange(-1, 1);
+                            const p = new HomingProjectile(this.x, this.y, Math.cos(a)*6, Math.sin(a)*6, 2, '#ef4444');
+                            p.isPlayer = false; 
+                            p.target = player;
+                            projectiles.push(p);
+                        }
+                    }
+
+                    // Static Mines (stationary projectiles with high life)
+                    if (this.stateTimer % 40 === 0) {
+                        const mine = new Projectile(this.x + randomRange(-50,50), this.y + randomRange(-50,50), 0, 0, 2, '#ef4444', false);
+                        mine.life = 400; // Last long
+                        mine.radius = 12;
+                        projectiles.push(mine);
+                    }
+                }
+                this.draw();
+            }
+
+            takeDamage(dmg) {
+                this.health -= dmg;
+                this.hitFlash = 5;
+                addFloatingText(this.x + randomRange(-40,40), this.y + randomRange(-40,40), Math.floor(dmg), '#fff', 1.5);
+                this.updateUI();
+                
+                if (this.health <= this.nextDropThreshold && this.health > 0) {
+                    this.nextDropThreshold -= this.maxHealth * 0.1;
+                    for(let i=0; i<5; i++) drops.push(new Drop(this.x + randomRange(-60,60), this.y + randomRange(-60,60), 'hp'));
+                }
+                
+                if (this.health <= 0) {
+                    screenShake += 100;
+                    for(let i=0; i<300; i++) createParticles(this.x + randomRange(-150, 150), this.y + randomRange(-150, 150), '#38bdf8', 3, 20);
+                    novaEffects.push(new Nova(this.x, this.y, 2500, '#fff', 0));
+                    
+                    for(let i=0; i<100; i++) drops.push(new Drop(this.x + randomRange(-80,80), this.y + randomRange(-80,80), 'xp'));
+                    for(let i=0; i<30; i++) drops.push(new Drop(this.x + randomRange(-80,80), this.y + randomRange(-80,80), 'hp'));
+                    
+                    gameState.score += 50000;
+                    DOM.score.innerText = gameState.score;
+                    DOM.bossHud.classList.add('hidden');
+                    addFloatingText(this.x, this.y, "NEBULA WEAVER DEFEATED", '#fff', 4);
+                    
+                    gameState.bossActive = false;
+                    boss = null;
+                    setTimeout(() => { advanceWave(); }, 3000);
                 }
             }
         }
 
         class Enemy {
-            constructor(x, y, isElite = false) {
+            constructor(x, y, type = 'basic') {
                 this.x = x; this.y = y;
-                this.isElite = isElite;
-                this.radius = isElite ? 30 : 15;
+                this.type = type; // 'basic', 'elite', 'shooter', 'dasher'
+                
                 const hpScale = 1 + (gameState.wave * 0.2);
-                this.maxHealth = isElite ? Math.floor(15 * hpScale) : Math.floor(3 * hpScale);
-                this.health = this.maxHealth;
-                this.speed = (isElite ? 2 : Math.random() * 2 + 3) + (gameState.wave * 0.1);
-                this.color = isElite ? '#ec4899' : ['#8b5cf6', '#f59e0b', '#3b82f6'][Math.floor(Math.random() * 3)];
                 this.state = 'wander'; 
                 this.angle = Math.random() * Math.PI * 2;
                 this.fireTimer = Math.random() * 100;
                 this.hitByNova = false;
+
+                if (type === 'elite') {
+                    this.radius = 30;
+                    this.maxHealth = Math.floor(15 * hpScale);
+                    this.speed = 2 + (gameState.wave * 0.1);
+                    this.color = '#ec4899'; // Pink
+                } else if (type === 'shooter') {
+                    this.radius = 18;
+                    this.maxHealth = Math.floor(5 * hpScale);
+                    this.speed = 1.5 + (gameState.wave * 0.1);
+                    this.color = '#f97316'; // Orange
+                } else if (type === 'dasher') {
+                    this.radius = 12;
+                    this.maxHealth = Math.floor(2 * hpScale);
+                    this.speed = 5 + (gameState.wave * 0.15); // Very fast
+                    this.color = '#22c55e'; // Green
+                } else {
+                    this.radius = 15;
+                    this.maxHealth = Math.floor(3 * hpScale);
+                    this.speed = (Math.random() * 2 + 3) + (gameState.wave * 0.1);
+                    this.color = ['#8b5cf6', '#3b82f6'][Math.floor(Math.random() * 2)];
+                }
+                
+                this.health = this.maxHealth;
             }
             draw() {
                 if (this.x < camera.x - 50 || this.x > camera.x + camera.width + 50 || this.y < camera.y - 50 || this.y > camera.y + camera.height + 50) return;
@@ -956,9 +1509,16 @@
                 ctx.shadowBlur = 15; ctx.shadowColor = this.color;
                 
                 ctx.beginPath();
-                if(this.isElite) {
+                if(this.type === 'elite') {
                     ctx.moveTo(this.radius, 0); ctx.lineTo(-this.radius, this.radius); ctx.lineTo(-this.radius/2, 0); ctx.lineTo(-this.radius, -this.radius);
+                } else if (this.type === 'shooter') {
+                    // Diamond shape
+                    ctx.moveTo(this.radius, 0); ctx.lineTo(0, this.radius); ctx.lineTo(-this.radius, 0); ctx.lineTo(0, -this.radius);
+                } else if (this.type === 'dasher') {
+                    // Arrow shape
+                    ctx.moveTo(this.radius, 0); ctx.lineTo(-this.radius, this.radius/2); ctx.lineTo(-this.radius/2, 0); ctx.lineTo(-this.radius, -this.radius/2);
                 } else {
+                    // Pentagon
                     let sides = 5; let step = (Math.PI * 2) / sides;
                     for (let i = 0; i < sides; i++) {
                         let r = this.radius * (0.8 + Math.random() * 0.2); 
@@ -982,35 +1542,85 @@
             update() {
                 if(isPausedForUpgrade) return;
                 const distToPlayer = distance(this.x, this.y, player.x, player.y);
+                const targetAngle = Math.atan2(player.y - this.y, player.x - this.x);
                 
-                if (distToPlayer < 800) {
-                    this.state = 'chase';
-                } else if (distToPlayer > 1200) {
-                    this.state = 'wander';
-                }
+                // Behavior Logic based on type
+                if (this.type === 'shooter') {
+                    // Shooters keep distance and fire
+                    if (distToPlayer < 400) this.state = 'retreat';
+                    else if (distToPlayer > 600) this.state = 'chase';
+                    else this.state = 'shoot';
 
-                if (this.state === 'chase') {
-                    const targetAngle = Math.atan2(player.y - this.y, player.x - this.x);
                     let diff = targetAngle - this.angle;
                     diff = Math.atan2(Math.sin(diff), Math.cos(diff));
                     this.angle += Math.sign(diff) * Math.min(Math.abs(diff), 0.05);
-                    
-                    if (distToPlayer > 200) {
+
+                    if (this.state === 'chase') {
                         this.x += Math.cos(this.angle) * this.speed;
                         this.y += Math.sin(this.angle) * this.speed;
+                    } else if (this.state === 'retreat') {
+                        this.x -= Math.cos(this.angle) * this.speed;
+                        this.y -= Math.sin(this.angle) * this.speed;
                     }
-                    
-                    if (this.isElite) {
+
+                    this.fireTimer--;
+                    if (this.fireTimer <= 0 && distToPlayer < 800) {
+                        projectiles.push(new Projectile(this.x, this.y, Math.cos(this.angle)*6, Math.sin(this.angle)*6, 1, this.color, false));
+                        this.fireTimer = 80;
+                    }
+
+                } else if (this.type === 'dasher') {
+                    // Dashers wait, line up, then dash very fast
+                    if (this.state !== 'dash') {
+                        let diff = targetAngle - this.angle;
+                        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+                        this.angle += Math.sign(diff) * Math.min(Math.abs(diff), 0.1);
+                        
+                        this.fireTimer--;
+                        if (this.fireTimer <= 0 && Math.abs(diff) < 0.1) {
+                            this.state = 'dash';
+                            this.fireTimer = 40; // dash duration
+                        }
+                    } else {
+                        // Dashing straight
+                        this.x += Math.cos(this.angle) * this.speed * 2.5;
+                        this.y += Math.sin(this.angle) * this.speed * 2.5;
+                        createParticles(this.x, this.y, this.color, 1, 0.5); // dash trail
+                        
                         this.fireTimer--;
                         if (this.fireTimer <= 0) {
-                            projectiles.push(new Projectile(this.x, this.y, Math.cos(this.angle)*8, Math.sin(this.angle)*8, 1, '#ec4899', false));
-                            this.fireTimer = 100;
+                            this.state = 'wander';
+                            this.fireTimer = 100; // cooldown
                         }
                     }
+
                 } else {
-                    this.x += Math.cos(this.angle) * (this.speed * 0.5);
-                    this.y += Math.sin(this.angle) * (this.speed * 0.5);
-                    if(Math.random() < 0.01) this.angle += randomRange(-Math.PI/4, Math.PI/4);
+                    // Basic & Elite logic (chase and melee/shoot)
+                    if (distToPlayer < 800) this.state = 'chase';
+                    else if (distToPlayer > 1200) this.state = 'wander';
+
+                    if (this.state === 'chase') {
+                        let diff = targetAngle - this.angle;
+                        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+                        this.angle += Math.sign(diff) * Math.min(Math.abs(diff), 0.05);
+                        
+                        if (distToPlayer > 50) { // Don't clip completely into player
+                            this.x += Math.cos(this.angle) * this.speed;
+                            this.y += Math.sin(this.angle) * this.speed;
+                        }
+                        
+                        if (this.type === 'elite') {
+                            this.fireTimer--;
+                            if (this.fireTimer <= 0) {
+                                projectiles.push(new Projectile(this.x, this.y, Math.cos(this.angle)*8, Math.sin(this.angle)*8, 1, this.color, false));
+                                this.fireTimer = 100;
+                            }
+                        }
+                    } else {
+                        this.x += Math.cos(this.angle) * (this.speed * 0.5);
+                        this.y += Math.sin(this.angle) * (this.speed * 0.5);
+                        if(Math.random() < 0.01) this.angle += randomRange(-Math.PI/4, Math.PI/4);
+                    }
                 }
                 
                 this.x = Math.max(0, Math.min(WORLD_SIZE, this.x));
@@ -1120,6 +1730,7 @@
         let drops = [];
         let floatingTexts = [];
         let novaEffects = [];
+        let singularities = [];
         let stars = [], deepStars = [], spaceDust = [];
         let boss = null;
 
@@ -1145,8 +1756,13 @@
                 const ey = player.y + Math.sin(angle) * dist;
                 
                 if (ex > 0 && ex < WORLD_SIZE && ey > 0 && ey < WORLD_SIZE) {
-                    const isElite = Math.random() < (0.05 + gameState.wave * 0.01);
-                    enemies.push(new Enemy(ex, ey, isElite));
+                    let type = 'basic';
+                    const rand = Math.random();
+                    if (rand < 0.05 + gameState.wave * 0.01) type = 'elite';
+                    else if (rand < 0.2 + gameState.wave * 0.02) type = 'shooter';
+                    else if (rand < 0.35 + gameState.wave * 0.02) type = 'dasher';
+                    
+                    enemies.push(new Enemy(ex, ey, type));
                 }
             }
         }
@@ -1170,27 +1786,39 @@
             if (gameState.wave % 3 === 0) {
                 gameState.bossActive = true;
                 const angle = Math.random() * Math.PI * 2;
-                boss = new Boss(player.x + Math.cos(angle) * 1000, player.y + Math.sin(angle) * 1000);
+                const bx = player.x + Math.cos(angle) * 1000;
+                const by = player.y + Math.sin(angle) * 1000;
+                
+                if (gameState.wave === 3) boss = new Boss(bx, by);
+                else if (gameState.wave === 6) boss = new BossPhaseTwo(bx, by);
+                else if (gameState.wave === 9) boss = new BossWave9(bx, by);
+                else boss = new BossPhaseTwo(bx, by); // Loop fallback
             }
         }
 
-        function showUpgrades() {
+        const upgradeOptions = [
+            { name: "TWIN LINK", desc: "+2 Projectile", action: () => player.projectiles += 2 },
+            { name: "CALIBER UP", desc: "+2 Damage", action: () => player.damage += 2 },
+            { name: "OVERCLOCK", desc: "+Fire Rate", action: () => player.fireRate = Math.max(2, player.fireRate - 2) },
+            { name: "HULL PLATING", desc: "+10 Max HP", action: () => { player.maxHealth += 10; player.health += 10; } },
+            { name: "THRUSTERS", desc: "+Speed", action: () => { player.baseMaxSpeed += 2; } },
+            { name: "NANOBOTS", desc: "Heal to Full", action: () => player.health = player.maxHealth }
+        ];
+
+        function showUpgrades(forcedOptions = null, headerText = "LEVEL UP!", subText = "Choose an upgrade to enhance your ship") {
             isPausedForUpgrade = true;
             DOM.upgradeMenu.classList.remove('hidden');
             DOM.upgradeMenu.classList.add('flex');
             DOM.upgradeCards.innerHTML = '';
             
-            const options = [
-                { name: "TWIN LINK", desc: "+1 Projectile", action: () => player.projectiles++ },
-                { name: "CALIBER UP", desc: "+1 Damage", action: () => player.damage++ },
-                { name: "OVERCLOCK", desc: "+Fire Rate", action: () => player.fireRate = Math.max(4, player.fireRate - 2) },
-                { name: "HULL PLATING", desc: "+5 Max HP", action: () => { player.maxHealth += 5; player.health += 5; } },
-                { name: "THRUSTERS", desc: "+Speed", action: () => { player.baseMaxSpeed += 2; } },
-                { name: "NANOBOTS", desc: "Heal to Full", action: () => player.health = player.maxHealth }
-            ];
+            DOM.upgradeMenu.querySelector('h1').innerText = headerText;
+            DOM.upgradeMenu.querySelector('p').innerText = subText;
             
-            const shuffled = options.sort(() => 0.5 - Math.random());
-            const selected = shuffled.slice(0, 3);
+            let selected = forcedOptions;
+            if (!selected) {
+                const shuffled = upgradeOptions.sort(() => 0.5 - Math.random());
+                selected = shuffled.slice(0, 3);
+            }
             
             selected.forEach(opt => {
                 const btn = document.createElement('button');
@@ -1204,6 +1832,24 @@
                     isPausedForUpgrade = false;
                 };
                 DOM.upgradeCards.appendChild(btn);
+            });
+        }
+
+        function triggerBoss1Rewards() {
+            // Apply 3 random upgrades immediately
+            const shuffled = upgradeOptions.sort(() => 0.5 - Math.random());
+            const rewards = shuffled.slice(0, 3);
+            
+            rewards.forEach(r => r.action());
+            player.updateUI();
+            
+            // Show massive text
+            const cx = player.x; const cy = player.y;
+            addFloatingText(cx, cy - 80, "!!! BOSS REWARDS GRANTED !!!", '#a855f7', 2);
+            rewards.forEach((r, idx) => {
+                setTimeout(() => {
+                    addFloatingText(player.x, player.y - 40, `+ ${r.name}`, '#f59e0b', 1.5);
+                }, idx * 500);
             });
         }
 
@@ -1243,9 +1889,9 @@
                             createParticles(e.x, e.y, e.color, 20);
                             
                             if (Math.random() > 0.3) drops.push(new Drop(e.x, e.y, 'xp'));
-                            if (Math.random() > 0.9 || (e.isElite && Math.random() > 0.5)) drops.push(new Drop(e.x + 10, e.y, 'hp'));
+                            if (Math.random() > 0.9 || (e.type === 'elite' && Math.random() > 0.5)) drops.push(new Drop(e.x + 10, e.y, 'hp'));
                             
-                            gameState.score += e.isElite ? 50 : 10;
+                            gameState.score += e.type === 'elite' ? 50 : 10;
                             DOM.score.innerText = gameState.score;
                             enemies.splice(j, 1);
                             
@@ -1296,6 +1942,8 @@
                 document.getElementById('joystickZone').classList.add('flex');
                 document.getElementById('mobileAbilityBtn').classList.remove('hidden');
                 document.getElementById('mobileAbilityBtn').classList.add('flex');
+                document.getElementById('mobileSwapBtn').classList.remove('hidden');
+                document.getElementById('mobileSwapBtn').classList.add('flex');
             }
             DOM.bossHud.classList.add('hidden');
             
@@ -1306,7 +1954,7 @@
             DOM.wave.innerText = 'WAVE 1';
             
             frameCount = 0; screenShake = 0;
-            projectiles = []; enemies = []; particles = []; drops = []; floatingTexts = []; boss = null; novaEffects = [];
+            projectiles = []; enemies = []; particles = []; drops = []; floatingTexts = []; boss = null; novaEffects = []; singularities = [];
             
             player = new Player();
             player.updateUI();
@@ -1343,6 +1991,7 @@
             DOM.topPauseBtn.classList.add('hidden');
             document.getElementById('joystickZone').classList.add('hidden');
             document.getElementById('mobileAbilityBtn').classList.add('hidden');
+            document.getElementById('mobileSwapBtn').classList.add('hidden');
             DOM.mainMenu.classList.remove('hidden');
             canvas.style.cursor = 'default';
             animateMenuBg(); 
@@ -1356,6 +2005,7 @@
             DOM.topPauseBtn.classList.add('hidden');
             document.getElementById('joystickZone').classList.add('hidden');
             document.getElementById('mobileAbilityBtn').classList.add('hidden');
+            document.getElementById('mobileSwapBtn').classList.add('hidden');
             DOM.gameOverMenu.classList.remove('hidden');
             
             document.getElementById('finalScore').innerText = gameState.score;
@@ -1392,7 +2042,7 @@
 
             // Draw boss
             if (boss && gameState.bossActive) {
-                ctx.fillStyle = '#dc2626';
+                ctx.fillStyle = boss.color;
                 const bx = mx + (boss.x * scale);
                 const by = my + (boss.y * scale);
                 ctx.beginPath(); ctx.arc(bx, by, 4, 0, Math.PI * 2); ctx.fill();
@@ -1453,6 +2103,15 @@
             stars.forEach(s => s.draw());
             spaceDust.forEach(s => s.update());
 
+            for (let i = singularities.length - 1; i >= 0; i--) { 
+                singularities[i].update(); 
+                if (singularities[i].life <= 0) {
+                    novaEffects.push(new Nova(singularities[i].x, singularities[i].y, 400, '#8b5cf6', 20));
+                    screenShake += 10;
+                    singularities.splice(i, 1); 
+                }
+            }
+
             for (let i = drops.length - 1; i >= 0; i--) { drops[i].update(); if (drops[i].life <= 0) drops.splice(i, 1); }
             for (let i = enemies.length - 1; i >= 0; i--) { enemies[i].update(); }
             if (boss && gameState.bossActive) boss.update();
@@ -1490,6 +2149,19 @@
         window.addEventListener('keydown', (e) => { 
             if (keys.hasOwnProperty(e.key)) keys[e.key] = true; 
             if (e.key === 'Shift') keys.Shift = true; 
+            
+            // Warp to Wave 9 Cheat
+            if (e.key.toLowerCase() === 'd' && keys.Shift && isPlaying && !isPausedForUpgrade && !isPaused) {
+                enemies = [];
+                projectiles = [];
+                gameState.wave = 8; // set to 8 so advance wave bumps to 9
+                gameState.enemiesKilledInWave = 9999;
+                screenShake += 50;
+                DOM.gameWrapper.classList.add('damage-flash');
+                setTimeout(() => DOM.gameWrapper.classList.remove('damage-flash'), 300);
+                advanceWave();
+            }
+
             if (e.key.toLowerCase() === 'l' && isPlaying && !isPausedForUpgrade && !isPaused) player.switchAbility();
             if (e.key === 'Escape' || e.key.toLowerCase() === 'p') togglePause();
         });
@@ -1574,6 +2246,11 @@
         document.getElementById('mobileAbilityBtn').addEventListener('touchstart', (e) => {
             e.preventDefault();
             if(isPlaying && !isPausedForUpgrade && !isPaused) player.useAbility();
+        });
+
+        document.getElementById('mobileSwapBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if(isPlaying && !isPausedForUpgrade && !isPaused) player.switchAbility();
         });
 
         // Control Mode Selector Logic
