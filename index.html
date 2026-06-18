@@ -19,11 +19,16 @@
         .xp-bar { background: #a855f7; box-shadow: 0 0 10px #a855f7; transition: width 0.2s ease-out; }
         @keyframes flashRed { 0% { background-color: rgba(255, 0, 0, 0.4); } 100% { background-color: transparent; } }
         .damage-flash { animation: flashRed 0.3s ease-out; }
+        .scanlines { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1)); background-size: 100% 4px; pointer-events: none; z-index: 25; mix-blend-mode: overlay; }
+        .vignette { position: absolute; inset: 0; background: radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(0,0,0,0.6) 100%); pointer-events: none; z-index: 24; }
     </style>
 </head>
 <body>
     <div id="gameWrapper" class="relative w-full h-full">
         <canvas id="gameCanvas" class="absolute top-0 left-0 w-full h-full z-0"></canvas>
+
+        <div class="scanlines"></div>
+        <div class="vignette"></div>
 
         <!-- HUD -->
         <div id="hud" class="absolute inset-0 pointer-events-none z-10 hidden">
@@ -105,7 +110,7 @@
         <div id="upgradeMenu" class="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-90 z-30 hidden backdrop-blur-md">
             <h1 class="text-4xl md:text-6xl font-black mb-2 text-fuchsia-400 neon-text-purple">LEVEL UP!</h1>
             <p class="text-xl mb-8 text-gray-300">Choose an upgrade to enhance your ship</p>
-            <div id="upgradeCardsContainer" class="flex flex-col md:flex-row gap-6 max-w-4xl px-4 w-full justify-center">
+            <div id="upgradeCardsContainer" class="flex flex-row flex-wrap gap-4 md:gap-6 max-w-4xl px-4 w-full justify-center">
                 <!-- Cards injected here -->
             </div>
         </div>
@@ -136,6 +141,20 @@
             <p class="text-xl mb-8 text-gray-400">Survived to Wave: <span id="finalWave" class="text-white font-bold">1</span></p>
             <button id="restartBtn" class="btn-neon px-12 py-4 text-xl font-bold rounded-lg cursor-pointer mt-4">REDEPLOY</button>
         </div>
+
+        <!-- Pause Menu -->
+        <div id="pauseMenu" class="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-80 z-40 hidden backdrop-blur-md pointer-events-auto">
+            <h1 class="text-6xl md:text-8xl font-black mb-8 text-cyan-400 neon-text">PAUSED</h1>
+            <div class="flex flex-col gap-4">
+                <button id="resumeBtn" class="btn-neon px-12 py-4 text-xl font-bold rounded-lg cursor-pointer">RESUME</button>
+                <button id="quitBtn" class="bg-transparent border-2 border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-12 py-4 text-xl font-bold rounded-lg cursor-pointer transition-colors shadow-[0_0_10px_#ef4444] hover:shadow-[0_0_20px_#ef4444]">QUIT TO MENU</button>
+            </div>
+        </div>
+
+        <!-- Top Pause Button -->
+        <div id="topPauseBtn" class="absolute top-24 right-4 z-20 hidden pointer-events-auto cursor-pointer p-3 bg-black bg-opacity-50 rounded-full border border-cyan-500 shadow-[0_0_10px_rgba(0,255,255,0.3)] hover:bg-cyan-500 hover:bg-opacity-20 transition-all">
+            <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </div>
     </div>
 
     <script>
@@ -147,6 +166,10 @@
             mainMenu: document.getElementById('mainMenu'),
             gameOverMenu: document.getElementById('gameOverMenu'),
             upgradeMenu: document.getElementById('upgradeMenu'),
+            pauseMenu: document.getElementById('pauseMenu'),
+            resumeBtn: document.getElementById('resumeBtn'),
+            quitBtn: document.getElementById('quitBtn'),
+            topPauseBtn: document.getElementById('topPauseBtn'),
             hud: document.getElementById('hud'),
             bossHud: document.getElementById('bossHud'),
             bossName: document.getElementById('bossName'),
@@ -170,6 +193,7 @@
         let animationId;
         let isPlaying = false;
         let isPausedForUpgrade = false;
+        let isPaused = false;
         let frameCount = 0;
         let screenShake = 0;
         let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -234,11 +258,13 @@
                 // Abilities
                 this.abilities = [
                     { name: 'MISSILE SWARM', maxCd: 300, currentCd: 0, color: '#d946ef' }, // 5 seconds
-                    { name: 'EMP NOVA', maxCd: 600, currentCd: 0, color: '#38bdf8' },     // 10 seconds
+                    { name: 'EMP NOVA', maxCd: 600, currentCd: 0, color: '#38bdf8' },      // 10 seconds
                     { name: 'PLASMA SHIELD', maxCd: 900, currentCd: 0, color: '#4ade80' }  // 15 seconds
                 ];
                 this.currentAbilityIndex = 0;
                 this.shieldActive = 0; // Frames remaining for shield
+                
+                this.trail = [];
             }
 
             gainXP(amount) {
@@ -315,6 +341,22 @@
 
             draw() {
                 ctx.save();
+                
+                if (this.trail.length > 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(this.trail[0].x - camera.x, this.trail[0].y - camera.y);
+                    for(let i=1; i<this.trail.length; i++) {
+                        ctx.lineTo(this.trail[i].x - camera.x, this.trail[i].y - camera.y);
+                    }
+                    ctx.strokeStyle = `rgba(0, 255, 255, 0.3)`;
+                    ctx.lineWidth = this.width * 0.4;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#0ff';
+                    ctx.stroke();
+                }
+
                 ctx.translate(this.x - camera.x, this.y - camera.y);
                 
                 // Blink if invulnerable
@@ -326,13 +368,26 @@
                 ctx.shadowBlur = 20;
                 ctx.shadowColor = this.color;
                 
-                // Ship hull
                 ctx.beginPath();
-                ctx.moveTo(0, -this.height / 2);
-                ctx.lineTo(this.width / 2, this.height / 2);
-                ctx.lineTo(-this.width / 2, this.height / 2);
+                ctx.moveTo(0, -this.height / 2); // Nose
+                ctx.lineTo(this.width / 2, this.height / 2); // Right wing tip
+                ctx.lineTo(this.width / 4, this.height / 3); // Right inner wing
+                ctx.lineTo(-this.width / 4, this.height / 3); // Left inner wing
+                ctx.lineTo(-this.width / 2, this.height / 2); // Left wing tip
                 ctx.closePath();
-                ctx.fillStyle = this.color;
+                ctx.fillStyle = '#1e1e2f'; // Dark hull
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = this.color;
+                ctx.stroke();
+                
+                // Cockpit glow
+                ctx.beginPath();
+                ctx.moveTo(0, -this.height / 5);
+                ctx.lineTo(4, 4);
+                ctx.lineTo(-4, 4);
+                ctx.closePath();
+                ctx.fillStyle = '#fff';
                 ctx.fill();
                 
                 // Engine flame logic
@@ -369,6 +424,9 @@
 
             update() {
                 if (isPausedForUpgrade) return;
+
+                this.trail.push({x: this.x, y: this.y});
+                if (this.trail.length > 12) this.trail.shift();
 
                 // Cooldowns
                 this.abilities.forEach(ab => {
@@ -504,8 +562,20 @@
                 ctx.save();
                 ctx.translate(this.x - camera.x, this.y - camera.y);
                 ctx.shadowBlur = 10; ctx.shadowColor = this.color;
-                ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = this.color; ctx.fill();
+                
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(-this.vx * 1.5, -this.vy * 1.5);
+                ctx.lineWidth = this.radius;
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = this.color;
+                ctx.stroke();
+                
+                // White hot core
+                ctx.lineWidth = this.radius / 2;
+                ctx.strokeStyle = '#fff';
+                ctx.stroke();
+                
                 ctx.restore();
             }
             update() {
@@ -1107,8 +1177,8 @@
             
             selected.forEach(opt => {
                 const btn = document.createElement('button');
-                btn.className = "bg-white bg-opacity-5 hover:bg-opacity-20 border border-purple-500 rounded p-6 flex flex-col items-center transition-all cursor-pointer transform hover:scale-105 shadow-[0_0_15px_rgba(168,85,247,0.2)]";
-                btn.innerHTML = `<h3 class="text-xl font-bold text-fuchsia-400 mb-2">${opt.name}</h3><p class="text-sm text-gray-300 text-center">${opt.desc}</p>`;
+                btn.className = "bg-white bg-opacity-5 hover:bg-opacity-20 border border-purple-500 rounded p-4 md:p-6 flex flex-col items-center transition-all cursor-pointer transform hover:scale-105 shadow-[0_0_15px_rgba(168,85,247,0.2)] w-[45%] md:w-auto flex-1 min-w-[120px]";
+                btn.innerHTML = `<h3 class="text-md md:text-xl font-bold text-fuchsia-400 mb-1 md:mb-2">${opt.name}</h3><p class="text-xs md:text-sm text-gray-300 text-center">${opt.desc}</p>`;
                 btn.onclick = () => {
                     opt.action();
                     player.updateUI();
@@ -1200,6 +1270,9 @@
         function startGame() {
             DOM.mainMenu.classList.add('hidden');
             DOM.gameOverMenu.classList.add('hidden');
+            DOM.pauseMenu.classList.add('hidden');
+            DOM.pauseMenu.classList.remove('flex');
+            DOM.topPauseBtn.classList.remove('hidden');
             DOM.hud.classList.remove('hidden');
             if(isMobile) {
                 document.getElementById('joystickZone').classList.remove('hidden');
@@ -1227,8 +1300,35 @@
 
             isPlaying = true;
             isPausedForUpgrade = false;
+            isPaused = false;
             if (animationId) cancelAnimationFrame(animationId);
             animate();
+        }
+
+        function togglePause() {
+            if (!isPlaying || isPausedForUpgrade || !DOM.gameOverMenu.classList.contains('hidden')) return;
+            isPaused = !isPaused;
+            if (isPaused) {
+                DOM.pauseMenu.classList.remove('hidden');
+                DOM.pauseMenu.classList.add('flex');
+            } else {
+                DOM.pauseMenu.classList.add('hidden');
+                DOM.pauseMenu.classList.remove('flex');
+            }
+        }
+
+        function quitToMenu() {
+            isPlaying = false;
+            isPaused = false;
+            DOM.pauseMenu.classList.add('hidden');
+            DOM.pauseMenu.classList.remove('flex');
+            DOM.hud.classList.add('hidden');
+            DOM.topPauseBtn.classList.add('hidden');
+            document.getElementById('joystickZone').classList.add('hidden');
+            document.getElementById('mobileAbilityBtn').classList.add('hidden');
+            DOM.mainMenu.classList.remove('hidden');
+            canvas.style.cursor = 'default';
+            animateMenuBg(); 
         }
 
         function endGame() {
@@ -1236,6 +1336,7 @@
             canvas.style.cursor = 'default';
             
             DOM.hud.classList.add('hidden');
+            DOM.topPauseBtn.classList.add('hidden');
             document.getElementById('joystickZone').classList.add('hidden');
             document.getElementById('mobileAbilityBtn').classList.add('hidden');
             DOM.gameOverMenu.classList.remove('hidden');
@@ -1287,11 +1388,30 @@
             ctx.strokeRect(px - cvW/2, py - cvH/2, cvW, cvH);
         }
 
+        function drawGrid() {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            const gridSize = 150;
+            const offsetX = camera.x % gridSize;
+            const offsetY = camera.y % gridSize;
+            
+            ctx.beginPath();
+            for(let x = -offsetX; x <= canvas.width; x += gridSize) {
+                ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+            }
+            for(let y = -offsetY; y <= canvas.height; y += gridSize) {
+                ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
         function animate() {
             if (!isPlaying) return;
             animationId = requestAnimationFrame(animate);
             
-            if (isPausedForUpgrade) return;
+            if (isPausedForUpgrade || isPaused) return;
 
             frameCount++;
             if (screenShake > 0) {
@@ -1309,6 +1429,8 @@
             // Camera follow
             camera.x += (player.x - canvas.width / 2 - camera.x) * 0.1;
             camera.y += (player.y - canvas.height / 2 - camera.y) * 0.1;
+
+            drawGrid();
 
             deepStars.forEach(s => s.draw());
             stars.forEach(s => s.draw());
@@ -1351,18 +1473,24 @@
         window.addEventListener('keydown', (e) => { 
             if (keys.hasOwnProperty(e.key)) keys[e.key] = true; 
             if (e.key === 'Shift') keys.Shift = true; 
-            if (e.key.toLowerCase() === 'l' && isPlaying && !isPausedForUpgrade) player.switchAbility();
+            if (e.key.toLowerCase() === 'l' && isPlaying && !isPausedForUpgrade && !isPaused) player.switchAbility();
+            if (e.key === 'Escape' || e.key.toLowerCase() === 'p') togglePause();
         });
         window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = false; if (e.key === 'Shift') keys.Shift = false; });
         window.addEventListener('mousemove', (e) => { if(!isMobile){ mouse.x = e.clientX; mouse.y = e.clientY; }});
         window.addEventListener('mousedown', (e) => { 
             if(e.target === canvas) {
                 if(e.button === 0) mouse.isDown = true; 
-                if(e.button === 2 && isPlaying && !isPausedForUpgrade) player.useAbility();
+                if(e.button === 2 && isPlaying && !isPausedForUpgrade && !isPaused) player.useAbility();
             }
         });
         window.addEventListener('mouseup', (e) => { if(e.button === 0) mouse.isDown = false; });
         canvas.addEventListener('contextmenu', e => { e.preventDefault(); return false; });
+
+        // Pause Menu Listeners
+        DOM.resumeBtn.addEventListener('click', togglePause);
+        DOM.quitBtn.addEventListener('click', quitToMenu);
+        DOM.topPauseBtn.addEventListener('click', togglePause);
 
         // Mobile Controls
         const joystickZone = document.getElementById('joystickZone');
@@ -1417,7 +1545,7 @@
 
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
-             if(isPlaying && !isPausedForUpgrade) {
+             if(isPlaying && !isPausedForUpgrade && !isPaused) {
                  for(let i=0; i<e.touches.length; i++) {
                      if(e.touches[i].identifier !== joystick.id) mouse.isDown = true;
                  }
@@ -1428,7 +1556,7 @@
 
         document.getElementById('mobileAbilityBtn').addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if(isPlaying && !isPausedForUpgrade) player.useAbility();
+            if(isPlaying && !isPausedForUpgrade && !isPaused) player.useAbility();
         });
 
         document.getElementById('startBtn').addEventListener('click', startGame);
